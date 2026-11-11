@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ed">
+  <title>Learn truss forces — Small Span</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f3ed;
+      --white: #fffefa;
+      --ink: #191815;
+      --muted: #6a675f;
+      --line: #c9c5ba;
+      --wood: #a8733e;
+      --wood-dark: #754c2d;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    button, a { font: inherit; }
+
+    .page {
+      width: min(1050px, 100%);
+      margin: 0 auto;
+      padding: 28px clamp(16px, 4vw, 48px) 36px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .wordmark {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .header-link {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      text-underline-offset: 3px;
+      white-space: nowrap;
+    }
+
+    .intro {
+      margin: 30px 0 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(36px, 6vw, 62px);
+      font-weight: 400;
+      letter-spacing: -.045em;
+      line-height: 1.02;
+    }
+
+    .intro p {
+      max-width: 690px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .card {
+      padding: clamp(16px, 3vw, 28px);
+      border: 1px solid var(--ink);
+      background: var(--white);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .card > p {
+      max-width: 720px;
+      margin: -4px 0 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .learning-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .force-animation {
+      display: block;
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fbfaf6;
+    }
+
+    .force-animation .truss-member {
+      fill: none;
+      stroke: var(--wood);
+      stroke-width: 9;
+      stroke-linecap: round;
+      transition: stroke .35s ease, stroke-width .35s ease, opacity .35s ease;
+    }
+
+    .force-animation.member-missing-left .truss-left,
+    .force-animation.member-missing-right .truss-right,
+    .force-animation.member-missing-bottom .truss-bottom {
+      opacity: 0;
+    }
+
+    .break-indicator {
+      display: none;
+      fill: none;
+      stroke: #b34f3e;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+
+    .force-animation[class*="member-missing-"] .break-indicator { display: block; }
+
+    .force-animation .truss-joint,
+    .force-animation .truss-support {
+      transition: cx .7s ease, cy .7s ease, d .7s ease, transform .7s ease;
+    }
+
+    .force-animation[class*="member-missing-"] .force-arrow,
+    .force-animation[class*="member-missing-"] .force-label,
+    .force-animation[class*="member-missing-"] .load-arrow {
+      display: none;
+      animation: none;
+      opacity: 0;
+    }
+
+    .force-animation.stage-compression .truss-left,
+    .force-animation.stage-compression .truss-right,
+    .force-animation.stage-summary .truss-left,
+    .force-animation.stage-summary .truss-right {
+      stroke: #b34f3e;
+      stroke-width: 12;
+    }
+
+    .force-animation.stage-tension .truss-bottom,
+    .force-animation.stage-summary .truss-bottom {
+      stroke: #426a57;
+      stroke-width: 12;
+    }
+
+    .force-animation .force-arrow {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 6 6;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+
+    .force-animation .compression-arrow { stroke: #b34f3e; }
+    .force-animation .tension-arrow { stroke: #426a57; }
+
+    .force-animation.stage-compression .compression-arrow,
+    .force-animation.stage-summary .compression-arrow,
+    .force-animation.stage-tension .tension-arrow,
+    .force-animation.stage-summary .tension-arrow { opacity: 1; }
+
+    .force-animation.stage-compression .compression-arrow,
+    .force-animation.stage-summary .compression-arrow,
+    .force-animation.stage-tension .tension-arrow,
+    .force-animation.stage-summary .tension-arrow {
+      animation: force-flow .8s linear infinite;
+    }
+
+    .force-animation .load-arrow {
+      transform: translateY(0);
+      transform-origin: 180px 50px;
+    }
+
+    .force-animation.stage-load .load-arrow,
+    .force-animation.stage-summary .load-arrow {
+      animation: load-press 1.2s ease-in-out infinite;
+    }
+
+    .force-animation.paused * { animation-play-state: paused !important; }
+
+    .force-animation text {
+      fill: var(--muted);
+      font: 11px "Segoe UI", Arial, sans-serif;
+    }
+
+    .force-animation .force-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      opacity: 0;
+      transition: opacity .25s ease;
+    }
+
+    .force-animation.stage-compression .compression-label,
+    .force-animation.stage-summary .compression-label,
+    .force-animation.stage-tension .tension-label,
+    .force-animation.stage-summary .tension-label { opacity: 1; }
+
+    @keyframes force-flow {
+      to { stroke-dashoffset: -24; }
+    }
+
+    @keyframes load-press {
+      0%, 100% { transform: translateY(-5px); }
+      55% { transform: translateY(8px); }
+    }
+
+    .animation-caption {
+      min-height: 42px;
+      margin: 10px 0 8px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .animation-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .animation-controls .action { flex: 1 1 120px; }
+
+    .removal-demo {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .removal-demo h3 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .removal-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .removal-controls .action {
+      min-height: 38px;
+      padding: 7px;
+      font-size: 11px;
+    }
+
+    .removal-note {
+      margin: 9px 0 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .force-animation *,
+      .force-animation *::before,
+      .force-animation *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+
+    .lesson-prompt {
+      margin: 0 0 10px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 19px;
+      line-height: 1.35;
+    }
+
+    .lesson-diagram {
+      display: block;
+      width: 100%;
+      max-height: 260px;
+      margin: 0 0 8px;
+      border: 1px solid var(--line);
+      background: #fbfaf6;
+    }
+
+    .lesson-member { cursor: pointer; }
+    .lesson-member .lesson-hit {
+      stroke: transparent;
+      stroke-width: 32;
+      stroke-linecap: round;
+      pointer-events: stroke;
+    }
+
+    .lesson-member line {
+      stroke: var(--wood);
+      stroke-width: 9;
+      stroke-linecap: round;
+      transition: stroke .12s ease, stroke-width .12s ease;
+    }
+
+    .lesson-member:hover line,
+    .lesson-member:focus-visible line,
+    .lesson-member.selected line {
+      stroke: var(--ink);
+      stroke-width: 13;
+    }
+
+    .lesson-member.identified line { stroke: #426a57; }
+
+    .lesson-member text {
+      fill: var(--muted);
+      font: 12px "Segoe UI", Arial, sans-serif;
+      pointer-events: none;
+    }
+
+    .lesson-diagram .lesson-support {
+      fill: var(--white);
+      stroke: var(--ink);
+      stroke-width: 2;
+    }
+
+    .lesson-diagram .lesson-load { stroke: var(--ink); stroke-width: 2; }
+
+    .lesson-instruction,
+    .lesson-feedback {
+      min-height: 38px;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .lesson-feedback { color: var(--ink); }
+
+    .lesson-answers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .action {
+      min-height: 42px;
+      padding: 9px 12px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      background: var(--white);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+      transition: background .12s ease, color .12s ease;
+    }
+
+    .action:hover {
+      background: var(--wood-light, #d3a776);
+      color: var(--ink);
+    }
+
+    .action:disabled {
+      cursor: not-allowed;
+      opacity: .5;
+    }
+
+    .lesson-answers .action { flex: 1 1 150px; }
+    .lesson-reset { margin-top: 8px; }
+
+    .lesson-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .lesson-legend strong { color: var(--ink); }
+
+    button:focus-visible, a:focus-visible {
+      outline: 3px solid var(--wood-dark);
+      outline-offset: 3px;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px solid var(--ink);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 720px) {
+      .learning-grid { grid-template-columns: 1fr; }
+      .page { padding-top: 18px; }
+      .intro { margin-top: 24px; }
+    }
+
+    @media (max-width: 520px) {
+      footer { display: block; }
+      footer span { display: block; }
+      footer span + span { margin-top: 5px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="wordmark">Small Span / Learning</div>
+      <a class="header-link" href="bridge-builder.html">← Open the bridge builder</a>
+    </header>
+
+    <section class="intro" aria-labelledby="page-title">
+      <h1 id="page-title">Learn to read the forces.</h1>
+      <p>Every bridge member has a job. Explore how a simple truss carries a load, then take what you learn back to the bridge builder.</p>
+    </section>
+
+    <section class="card" aria-labelledby="learning-heading">
+      <h2 id="learning-heading">Interactive learning · tension &amp; compression</h2>
+      <p>Follow the load through a simple truss, then inspect each member in the triangle below and decide whether it is being pulled or pushed.</p>
+      <div class="learning-grid">
+        <div>
+          <svg class="force-animation stage-load" id="force-animation" viewBox="0 0 360 220" role="img" aria-labelledby="force-animation-title force-animation-desc">
+            <title id="force-animation-title">Animated forces in a loaded triangular truss</title>
+            <desc id="force-animation-desc">A downward load is applied to the top joint. The sloping members carry compression and the bottom chord carries tension.</desc>
+            <defs>
+              <marker id="compression-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0 0 L10 5 L0 10 Z" fill="#b34f3e"></path>
+              </marker>
+              <marker id="tension-arrowhead" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M0 0 L10 5 L0 10 Z" fill="#426a57"></path>
+              </marker>
+            </defs>
+            <g class="load-arrow" id="demo-load-arrow">
+              <line x1="180" y1="14" x2="180" y2="43" stroke="#191815" stroke-width="2.5"></line>
+              <path d="M174 40 L180 51 L186 40" fill="none" stroke="#191815" stroke-width="2.5"></path>
+            </g>
+            <text id="demo-load-label" x="192" y="30">applied load</text>
+            <path class="truss-member truss-left" id="demo-left-member" d="M180 62 L72 164"></path>
+            <path class="truss-member truss-right" id="demo-right-member" d="M180 62 L288 164"></path>
+            <path class="truss-member truss-bottom" id="demo-bottom-member" d="M72 164 H288"></path>
+            <g class="compression-arrows">
+              <line class="force-arrow compression-arrow" x1="101" y1="137" x2="139" y2="101" marker-end="url(#compression-arrowhead)"></line>
+              <line class="force-arrow compression-arrow" x1="149" y1="91" x2="111" y2="127" marker-end="url(#compression-arrowhead)"></line>
+              <line class="force-arrow compression-arrow" x1="259" y1="137" x2="221" y2="101" marker-end="url(#compression-arrowhead)"></line>
+              <line class="force-arrow compression-arrow" x1="211" y1="91" x2="249" y2="127" marker-end="url(#compression-arrowhead)"></line>
+            </g>
+            <g class="tension-arrows">
+              <line class="force-arrow tension-arrow" x1="166" y1="164" x2="105" y2="164" marker-end="url(#tension-arrowhead)"></line>
+              <line class="force-arrow tension-arrow" x1="194" y1="164" x2="255" y2="164" marker-end="url(#tension-arrowhead)"></line>
+            </g>
+            <path class="break-indicator break-left" id="demo-break-left" d="M120 107 L132 119 M132 107 L120 119" aria-hidden="true"></path>
+            <path class="break-indicator break-right" id="demo-break-right" d="M228 107 L240 119 M240 107 L228 119" aria-hidden="true"></path>
+            <path class="break-indicator break-bottom" id="demo-break-bottom" d="M174 158 L186 170 M186 158 L174 170" aria-hidden="true"></path>
+            <text class="force-label compression-label" x="180" y="83" text-anchor="middle" fill="#b34f3e">COMPRESSION · PUSH</text>
+            <text class="force-label tension-label" x="180" y="199" text-anchor="middle" fill="#426a57">TENSION · PULL</text>
+            <circle class="truss-joint" id="demo-apex" cx="180" cy="62" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <circle class="truss-joint" id="demo-left-joint" cx="72" cy="164" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <circle class="truss-joint" id="demo-right-joint" cx="288" cy="164" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <path class="truss-support" id="demo-left-support" d="M58 177 H86 L72 164 Z" fill="#fffefa" stroke="#191815" stroke-width="2"></path>
+            <path class="truss-support" id="demo-right-support" d="M274 177 H302 L288 164 Z" fill="#fffefa" stroke="#191815" stroke-width="2"></path>
+          </svg>
+          <p class="animation-caption" id="animation-caption" aria-live="polite">A downward load presses on the top joint.</p>
+          <div class="animation-controls" role="group" aria-label="Truss force animation controls">
+            <button class="action" id="animation-toggle" type="button" aria-pressed="true">Pause animation</button>
+            <button class="action" id="animation-replay" type="button">Replay animation</button>
+          </div>
+          <section class="removal-demo" aria-labelledby="removal-heading">
+            <h3 id="removal-heading">What if a member is removed?</h3>
+            <div class="removal-controls" role="group" aria-label="Remove a truss member">
+              <button class="action" type="button" data-remove-member="left">Remove left brace</button>
+              <button class="action" type="button" data-remove-member="right">Remove right brace</button>
+              <button class="action" type="button" data-remove-member="bottom">Remove bottom chord</button>
+              <button class="action" id="restore-truss" type="button" disabled>Restore the truss</button>
+            </div>
+            <p class="removal-note">Illustrative deformation only: actual bridge behavior depends on its connections, supports, and materials.</p>
+          </section>
+        </div>
+        <div>
+          <p class="lesson-prompt" id="lesson-prompt">Choose a member in the diagram to begin.</p>
+          <svg class="lesson-diagram" id="lesson-diagram" viewBox="0 0 360 220" role="group" aria-labelledby="lesson-diagram-title lesson-diagram-desc">
+            <title id="lesson-diagram-title">A three-member truss with a load at its apex</title>
+            <desc id="lesson-diagram-desc">Select either sloping member or the bottom member to classify its force. A downward load acts at the top joint, and the two bottom joints are supported.</desc>
+            <line class="lesson-load" x1="180" y1="18" x2="180" y2="49"></line>
+            <path d="M174 42 L180 51 L186 42" fill="none" stroke="#191815" stroke-width="2"></path>
+            <text x="192" y="33" fill="#6a675f" font-size="11">load</text>
+            <g class="lesson-member" data-member="left" role="button" tabindex="0" aria-label="Left sloping member">
+              <line class="lesson-hit" x1="180" y1="62" x2="72" y2="164"></line>
+              <line x1="180" y1="62" x2="72" y2="164"></line>
+              <text x="96" y="105" text-anchor="middle">left slope</text>
+            </g>
+            <g class="lesson-member" data-member="right" role="button" tabindex="0" aria-label="Right sloping member">
+              <line class="lesson-hit" x1="180" y1="62" x2="288" y2="164"></line>
+              <line x1="180" y1="62" x2="288" y2="164"></line>
+              <text x="264" y="105" text-anchor="middle">right slope</text>
+            </g>
+            <g class="lesson-member" data-member="bottom" role="button" tabindex="0" aria-label="Bottom horizontal member">
+              <line class="lesson-hit" x1="72" y1="164" x2="288" y2="164"></line>
+              <line x1="72" y1="164" x2="288" y2="164"></line>
+              <text x="180" y="187" text-anchor="middle">bottom chord</text>
+            </g>
+            <circle cx="180" cy="62" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <circle cx="72" cy="164" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <circle cx="288" cy="164" r="5" fill="#fffefa" stroke="#191815" stroke-width="2"></circle>
+            <path class="lesson-support" d="M58 177 H86 L72 164 Z"></path>
+            <path class="lesson-support" d="M274 177 H302 L288 164 Z"></path>
+          </svg>
+          <p class="lesson-instruction" id="lesson-instruction">Select a member, then label its force.</p>
+          <p class="lesson-feedback" id="lesson-feedback" aria-live="polite">A downward load presses the two sloping members together; the bottom member resists the supports spreading apart.</p>
+          <div class="lesson-answers" role="group" aria-label="Classify the selected member">
+            <button class="action" type="button" data-force="tension">Tension · pulled</button>
+            <button class="action" type="button" data-force="compression">Compression · pushed</button>
+          </div>
+          <button class="action lesson-reset" id="lesson-reset" type="button">Start the exercise over</button>
+          <div class="lesson-legend">
+            <span><strong>Tension</strong> stretches a member as it is pulled.</span>
+            <span><strong>Compression</strong> shortens a member as it is pushed; slender members can buckle.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span>Wood members · water loads · learn by testing</span>
+      <a class="header-link" href="bridge-builder.html">Open the bridge builder →</a>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const lessonDiagram = document.getElementById("lesson-diagram");
+      const lessonPrompt = document.getElementById("lesson-prompt");
+      const lessonInstruction = document.getElementById("lesson-instruction");
+      const lessonFeedback = document.getElementById("lesson-feedback");
+      const lessonAnswerButtons = [...document.querySelectorAll("[data-force]")];
+      const lessonReset = document.getElementById("lesson-reset");
+      const forceAnimation = document.getElementById("force-animation");
+      const animationCaption = document.getElementById("animation-caption");
+      const animationToggle = document.getElementById("animation-toggle");
+      const animationReplay = document.getElementById("animation-replay");
+      const removalButtons = [...document.querySelectorAll("[data-remove-member]")];
+      const restoreTrussButton = document.getElementById("restore-truss");
+      const forceAnimationDesc = document.getElementById("force-animation-desc");
+      const demoMembers = {
+        left: document.getElementById("demo-left-member"),
+        right: document.getElementById("demo-right-member"),
+        bottom: document.getElementById("demo-bottom-member")
+      };
+      const demoJoints = {
+        apex: document.getElementById("demo-apex"),
+        left: document.getElementById("demo-left-joint"),
+        right: document.getElementById("demo-right-joint")
+      };
+      const demoSupports = {
+        left: document.getElementById("demo-left-support"),
+        right: document.getElementById("demo-right-support")
+      };
+      const demoLoadArrow = document.getElementById("demo-load-arrow");
+      const demoLoadLabel = document.getElementById("demo-load-label");
+      const demoBreaks = {
+        left: document.getElementById("demo-break-left"),
+        right: document.getElementById("demo-break-right"),
+        bottom: document.getElementById("demo-break-bottom")
+      };
+      const initialDemoPoints = {
+        apex: { x: 180, y: 62 },
+        left: { x: 72, y: 164 },
+        right: { x: 288, y: 164 }
+      };
+      const copyDemoPoints = points => ({
+        apex: { ...points.apex },
+        left: { ...points.left },
+        right: { ...points.right }
+      });
+      let demoPoints = copyDemoPoints(initialDemoPoints);
+      let demoMotionFrame = null;
+      const animationStages = [
+        { className: "stage-load", caption: "A downward load presses on the top joint." },
+        { className: "stage-compression", caption: "The two sloping members are compressed: the load pushes along them toward the supports." },
+        { className: "stage-tension", caption: "The bottom chord is in tension: it pulls outward to stop the supports spreading apart." },
+        { className: "stage-summary", caption: "Together, these push-and-pull forces carry the load through the triangle." }
+      ];
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let animationStage = 0;
+      let animationTimer = null;
+      let animationPlaying = !reducedMotion.matches;
+      let removedMember = null;
+      const lessonForces = { left: "compression", right: "compression", bottom: "tension" };
+      const lessonMemberLabels = {
+        left: "Left sloping member",
+        right: "Right sloping member",
+        bottom: "Bottom horizontal member"
+      };
+      const lessonExplanations = {
+        left: "The left sloping member is in compression: it is pushed along its length as the loaded apex presses down.",
+        right: "The right sloping member is in compression too. Together, the two slopes carry the apex load toward the supports.",
+        bottom: "The bottom chord is in tension: it is pulled outward at both ends and keeps the supports from spreading apart."
+      };
+      let selectedLessonMember = null;
+      const identifiedLessonMembers = new Set();
+
+      function showAnimationStage(index) {
+        if (removedMember !== null) return;
+        animationStage = index % animationStages.length;
+        forceAnimation.classList.remove(...animationStages.map(stage => stage.className));
+        forceAnimation.classList.add(animationStages[animationStage].className);
+        animationCaption.textContent = animationStages[animationStage].caption;
+      }
+
+      function setDemoGeometry(points) {
+        const { apex, left, right } = points;
+        demoMembers.left.setAttribute("d", `M${apex.x} ${apex.y} L${left.x} ${left.y}`);
+        demoMembers.right.setAttribute("d", `M${apex.x} ${apex.y} L${right.x} ${right.y}`);
+        demoMembers.bottom.setAttribute("d", `M${left.x} ${left.y} L${right.x} ${right.y}`);
+        demoJoints.apex.setAttribute("cx", apex.x);
+        demoJoints.apex.setAttribute("cy", apex.y);
+        demoJoints.left.setAttribute("cx", left.x);
+        demoJoints.left.setAttribute("cy", left.y);
+        demoJoints.right.setAttribute("cx", right.x);
+        demoJoints.right.setAttribute("cy", right.y);
+        demoSupports.left.setAttribute("d", `M${left.x - 14} ${left.y + 13} H${left.x + 14} L${left.x} ${left.y} Z`);
+        demoSupports.right.setAttribute("d", `M${right.x - 14} ${right.y + 13} H${right.x + 14} L${right.x} ${right.y} Z`);
+        demoLoadArrow.setAttribute("transform", `translate(${apex.x - 180} ${apex.y - 62})`);
+        demoLoadLabel.setAttribute("x", apex.x + 12);
+        demoLoadLabel.setAttribute("y", apex.y - 32);
+        demoPoints = {
+          apex: { ...apex },
+          left: { ...left },
+          right: { ...right }
+        };
+        if (removedMember !== null) setBreakMark(removedMember, demoPoints);
+      }
+
+      function setBreakMark(member, points) {
+        const endpoints = member === "left"
+          ? [points.apex, points.left]
+          : member === "right"
+            ? [points.apex, points.right]
+            : [points.left, points.right];
+        const x = (endpoints[0].x + endpoints[1].x) / 2;
+        const y = (endpoints[0].y + endpoints[1].y) / 2;
+        demoBreaks[member].setAttribute("d", `M${x - 6} ${y - 6} L${x + 6} ${y + 6} M${x + 6} ${y - 6} L${x - 6} ${y + 6}`);
+      }
+
+      function stopDemoMotion() {
+        if (demoMotionFrame !== null) {
+          window.cancelAnimationFrame(demoMotionFrame);
+          demoMotionFrame = null;
+        }
+      }
+
+      function animateDemoTo(target, duration, keepWobbling = false) {
+        stopDemoMotion();
+        const start = copyDemoPoints(demoPoints);
+        const startedAt = performance.now();
+        const reduced = reducedMotion.matches;
+        const finish = () => {
+          setDemoGeometry(target);
+          if (keepWobbling && !reduced) {
+            const wobbleStartedAt = performance.now();
+            const wobble = now => {
+              if (removedMember === null) {
+                demoMotionFrame = null;
+                return;
+              }
+              const offset = Math.sin((now - wobbleStartedAt) / 190) * 2.2;
+              const points = copyDemoPoints(target);
+              points.apex.y += offset;
+              if (removedMember === "bottom") {
+                points.left.x -= offset * .3;
+                points.right.x += offset * .3;
+              }
+              setDemoGeometry(points);
+              demoMotionFrame = window.requestAnimationFrame(wobble);
+            };
+            demoMotionFrame = window.requestAnimationFrame(wobble);
+          }
+        };
+
+        if (reduced) {
+          finish();
+          return;
+        }
+
+        const frame = now => {
+          const progress = Math.min(1, (now - startedAt) / duration);
+          const eased = 1 - (1 - progress) ** 3;
+          const wobble = Math.sin(progress * Math.PI * 5) * (1 - progress) * 3;
+          const points = {};
+          Object.keys(start).forEach(name => {
+            points[name] = {
+              x: start[name].x + (target[name].x - start[name].x) * eased,
+              y: start[name].y + (target[name].y - start[name].y) * eased
+            };
+          });
+          points.apex.y += wobble;
+          if (removedMember === "bottom") {
+            points.left.x -= wobble * .3;
+            points.right.x += wobble * .3;
+          }
+          setDemoGeometry(points);
+          if (progress < 1) {
+            demoMotionFrame = window.requestAnimationFrame(frame);
+          } else {
+            demoMotionFrame = null;
+            finish();
+          }
+        };
+        demoMotionFrame = window.requestAnimationFrame(frame);
+      }
+
+      function stopAnimation() {
+        if (animationTimer !== null) {
+          window.clearInterval(animationTimer);
+          animationTimer = null;
+        }
+        animationPlaying = false;
+        forceAnimation.classList.add("paused");
+        animationToggle.textContent = "Play animation";
+        animationToggle.setAttribute("aria-pressed", "false");
+      }
+
+      function startAnimation() {
+        if (removedMember !== null) return;
+        if (animationTimer !== null) window.clearInterval(animationTimer);
+        animationPlaying = true;
+        forceAnimation.classList.remove("paused");
+        animationToggle.textContent = "Pause animation";
+        animationToggle.setAttribute("aria-pressed", "true");
+        animationTimer = window.setInterval(() => {
+          showAnimationStage(animationStage + 1);
+        }, 2600);
+      }
+
+      animationToggle.addEventListener("click", () => {
+        if (animationPlaying) stopAnimation();
+        else startAnimation();
+      });
+
+      animationReplay.addEventListener("click", () => {
+        showAnimationStage(0);
+        startAnimation();
+      });
+
+      const memberFailureCaptions = {
+        left: {
+          caption: "The left brace snaps away. The unsupported top joint drops and the remaining members swing out of their stable triangle.",
+          description: "The left diagonal member has been removed. The remaining members are shown with an illustrative downward distortion."
+        },
+        right: {
+          caption: "The right brace snaps away. The unsupported top joint drops and the remaining members swing out of their stable triangle.",
+          description: "The right diagonal member has been removed. The remaining members are shown with an illustrative downward distortion."
+        },
+        bottom: {
+          caption: "The bottom chord snaps away. The diagonal legs swing outward and the supports spread apart.",
+          description: "The bottom chord has been removed. The diagonal members are shown spreading the supports outward in an illustrative failure."
+        }
+      };
+      const memberFailurePositions = {
+        left: {
+          apex: { x: 202, y: 128 },
+          left: { x: 72, y: 164 },
+          right: { x: 288, y: 164 }
+        },
+        right: {
+          apex: { x: 158, y: 128 },
+          left: { x: 72, y: 164 },
+          right: { x: 288, y: 164 }
+        },
+        bottom: {
+          apex: { x: 180, y: 124 },
+          left: { x: 48, y: 164 },
+          right: { x: 312, y: 164 }
+        }
+      };
+
+      removalButtons.forEach(button => {
+        button.addEventListener("click", () => {
+          if (removedMember !== null) return;
+          const member = button.dataset.removeMember;
+          if (animationTimer !== null) window.clearInterval(animationTimer);
+          animationTimer = null;
+          animationPlaying = false;
+          animationToggle.textContent = "Play animation";
+          animationToggle.setAttribute("aria-pressed", "false");
+          removedMember = member;
+          forceAnimation.classList.remove(
+            ...animationStages.map(stage => stage.className),
+            "member-missing-left",
+            "member-missing-right",
+            "member-missing-bottom"
+          );
+          forceAnimation.classList.add(`member-missing-${member}`);
+          const failure = memberFailureCaptions[member];
+          animationCaption.textContent = failure.caption;
+          forceAnimationDesc.textContent = failure.description;
+          removalButtons.forEach(option => { option.disabled = true; });
+          animationToggle.disabled = true;
+          animationReplay.disabled = true;
+          restoreTrussButton.disabled = false;
+          setBreakMark(member, initialDemoPoints);
+          animateDemoTo(memberFailurePositions[member], 1050, true);
+        });
+      });
+
+      restoreTrussButton.addEventListener("click", () => {
+        stopDemoMotion();
+        removedMember = null;
+        animateDemoTo(initialDemoPoints, 700);
+        forceAnimation.classList.remove("member-missing-left", "member-missing-right", "member-missing-bottom");
+        forceAnimationDesc.textContent = "A downward load is applied to the top joint. The sloping members carry compression and the bottom chord carries tension.";
+        removalButtons.forEach(button => { button.disabled = false; });
+        animationToggle.disabled = false;
+        animationReplay.disabled = false;
+        restoreTrussButton.disabled = true;
+        showAnimationStage(0);
+        if (!reducedMotion.matches) startAnimation();
+      });
+
+      if (reducedMotion.matches) stopAnimation();
+      else startAnimation();
+
+      reducedMotion.addEventListener("change", event => {
+        if (event.matches) {
+          stopAnimation();
+          stopDemoMotion();
+          if (removedMember !== null) setDemoGeometry(memberFailurePositions[removedMember]);
+        }
+      });
+
+      function updateLessonDiagram() {
+        lessonDiagram.querySelectorAll(".lesson-member").forEach(member => {
+          const name = member.dataset.member;
+          member.classList.toggle("selected", name === selectedLessonMember);
+          member.classList.toggle("identified", identifiedLessonMembers.has(name));
+          member.setAttribute("aria-pressed", name === selectedLessonMember ? "true" : "false");
+          member.setAttribute("aria-label", `${lessonMemberLabels[name]}${identifiedLessonMembers.has(name) ? ", correctly identified" : ""}`);
+        });
+      }
+
+      lessonDiagram.querySelectorAll(".lesson-member").forEach(member => {
+        const selectMember = () => {
+          if (identifiedLessonMembers.has(member.dataset.member)) return;
+          selectedLessonMember = member.dataset.member;
+          const name = lessonMemberLabels[member.dataset.member];
+          lessonPrompt.textContent = `Is the ${name.toLowerCase()} pulled (tension) or pushed (compression)?`;
+          lessonInstruction.textContent = "Choose tension or compression below.";
+          lessonFeedback.textContent = "Think about whether the loaded triangle pulls this bar longer or pushes it shorter.";
+          updateLessonDiagram();
+        };
+        member.addEventListener("click", selectMember);
+        member.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectMember();
+          }
+        });
+      });
+
+      lessonAnswerButtons.forEach(button => {
+        button.addEventListener("click", () => {
+          if (selectedLessonMember === null) {
+            lessonFeedback.textContent = "Select a member in the diagram first.";
+            return;
+          }
+          const correctForce = lessonForces[selectedLessonMember];
+          if (button.dataset.force !== correctForce) {
+            lessonFeedback.textContent = `Not quite. ${lessonExplanations[selectedLessonMember]}`;
+            return;
+          }
+          identifiedLessonMembers.add(selectedLessonMember);
+          lessonFeedback.textContent = `Correct. ${lessonExplanations[selectedLessonMember]}`;
+          selectedLessonMember = null;
+          updateLessonDiagram();
+          if (identifiedLessonMembers.size === Object.keys(lessonForces).length) {
+            lessonPrompt.textContent = "Exercise complete · you identified all three members.";
+            lessonInstruction.textContent = "Now look for the same push-and-pull pattern in the bridge you build.";
+          } else {
+            lessonPrompt.textContent = "Correct. Choose another member to classify.";
+            lessonInstruction.textContent = `${identifiedLessonMembers.size} of 3 members identified.`;
+          }
+        });
+      });
+
+      lessonReset.addEventListener("click", () => {
+        selectedLessonMember = null;
+        identifiedLessonMembers.clear();
+        lessonPrompt.textContent = "Choose a member in the diagram to begin.";
+        lessonInstruction.textContent = "Select a member, then label its force.";
+        lessonFeedback.textContent = "A downward load presses the two sloping members together; the bottom member resists the supports spreading apart.";
+        updateLessonDiagram();
+      });
+    })();
+  </script>
+</body>
+</html>

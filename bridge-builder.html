@@ -1,0 +1,1630 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ed">
+  <title>Bridge builder — Small Span</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f3ed;
+      --white: #fffefa;
+      --ink: #191815;
+      --muted: #6a675f;
+      --line: #c9c5ba;
+      --wood: #a8733e;
+      --wood-dark: #754c2d;
+      --wood-light: #d3a776;
+      --focus: #191815;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    button { font: inherit; }
+
+    .page {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      padding: 28px clamp(16px, 4vw, 48px) 36px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .wordmark {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .edition {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      text-align: right;
+    }
+
+    .intro {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 24px;
+      margin: 30px 0 24px;
+    }
+
+    h1 {
+      max-width: 690px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(34px, 5vw, 58px);
+      font-weight: 400;
+      letter-spacing: -.045em;
+      line-height: 1.02;
+    }
+
+    .intro p {
+      max-width: 280px;
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 286px;
+      grid-template-areas:
+        "drawing sidebar"
+        "below sidebar";
+      gap: 22px;
+      align-items: start;
+    }
+
+    .drawing-panel {
+      grid-area: drawing;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--ink);
+      background: var(--white);
+    }
+
+    aside { grid-area: sidebar; }
+
+    .drawing-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .drawing-heading strong {
+      font-size: 12px;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .drawing-heading span {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .scene-wrap {
+      padding: 12px 10px 0;
+      touch-action: none;
+    }
+
+    #scene {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .ground { fill: var(--ink); }
+    .ground-hatch {
+      fill: none;
+      stroke: var(--paper);
+      stroke-width: 1;
+      opacity: .8;
+    }
+    .bank-edge { stroke: var(--ink); stroke-width: 2; }
+    .guide {
+      stroke: #d6d2c8;
+      stroke-width: 1;
+      stroke-dasharray: 4 7;
+    }
+    .guide-label {
+      fill: var(--muted);
+      font-size: 11px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: .06em;
+    }
+    .support {
+      fill: var(--white);
+      stroke: var(--ink);
+      stroke-width: 2;
+    }
+    .member {
+      stroke: var(--wood);
+      stroke-width: 9;
+      stroke-linecap: square;
+    }
+    .member-edge {
+      stroke: var(--wood-dark);
+      stroke-width: 1.2;
+      stroke-linecap: square;
+    }
+    .member-piece {
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .joint {
+      fill: var(--white);
+      stroke: var(--ink);
+      stroke-width: 2;
+      cursor: pointer;
+      pointer-events: none;
+      transition: r .12s ease, fill .12s ease;
+    }
+    .joint.deck-joint { fill: var(--wood-light); }
+    .joint:hover, .joint:focus-visible, .joint.selected {
+      r: 9px;
+      fill: var(--white);
+      outline: none;
+      stroke-width: 3;
+    }
+    .joint:focus-visible { stroke-dasharray: 2 2; }
+    .joint-hit:focus-visible + .joint { stroke-dasharray: 2 2; stroke-width: 3; }
+    .joint-hit { fill: transparent; cursor: pointer; }
+    .beam-preview {
+      fill: none;
+      stroke: var(--wood);
+      stroke-width: 6;
+      stroke-dasharray: 8 6;
+      stroke-linecap: square;
+      pointer-events: none;
+    }
+    .test-ring {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 1.5;
+      stroke-dasharray: 3 3;
+    }
+    .tester {
+      transition: transform .42s ease;
+      pointer-events: none;
+    }
+    .bottle {
+      fill: var(--white);
+      stroke: var(--ink);
+      stroke-width: 1.8;
+      stroke-linejoin: round;
+    }
+    .bottle-water { fill: var(--wood-light); stroke: none; }
+    .bottle-cap { fill: var(--ink); }
+    .lower-guide { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 5; }
+
+    .menu-details {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .menu-details summary {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .menu-details p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+
+    .toggle-row input { margin-top: 2px; accent-color: var(--wood-dark); }
+    .donation-card h2 { margin-bottom: 8px; }
+    .donation-card p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .donation-card .action { margin-top: 8px; }
+
+    .instructions {
+      min-height: 48px;
+      margin: 0;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    aside { display: grid; gap: 14px; }
+
+    .below-simulation {
+      grid-area: below;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 16px;
+      border: 1px solid var(--ink);
+      background: var(--white);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .control-label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .bottle-choices {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    .choice, .action {
+      min-height: 42px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      background: var(--white);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background .12s ease, color .12s ease;
+    }
+
+    .stack-control {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 42px;
+      gap: 7px;
+      margin: 0 0 7px;
+    }
+
+    .stack-control button {
+      min-height: 40px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      background: var(--white);
+      color: var(--ink);
+      font-size: 19px;
+      cursor: pointer;
+    }
+
+    .stack-control button:hover:not(:disabled) {
+      background: var(--wood-light);
+    }
+
+    .stack-count {
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 650;
+      text-align: center;
+    }
+
+    .stack-summary {
+      min-height: 32px;
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .limit-note {
+      margin: -9px 0 14px;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .choice {
+      padding: 7px 8px;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    .choice[aria-pressed="true"], .action.primary {
+      background: var(--ink);
+      color: var(--white);
+    }
+
+    .choice:hover:not(:disabled), .action:hover:not(:disabled) {
+      background: var(--wood-light);
+      color: var(--ink);
+    }
+
+    button:focus-visible, a:focus-visible {
+      outline: 3px solid var(--wood-dark);
+      outline-offset: 3px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .48;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action {
+      padding: 9px 10px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .action.primary { grid-column: 1 / -1; }
+    .action.recommended { grid-column: 1 / -1; }
+    .action.keep-load-point { grid-column: 1 / -1; }
+    .action.recommended,
+    .action.recommended:hover:not(:disabled) {
+      border-color: var(--wood-dark);
+      background: var(--ink);
+      color: var(--white);
+      box-shadow: inset 0 0 0 2px var(--wood-light);
+    }
+
+    .status {
+      min-height: 52px;
+      margin: 13px 0 0;
+      padding-top: 11px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .status strong { display: block; }
+    .status span { color: var(--muted); }
+
+    .field-note {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .field-note + .field-note {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .refs {
+      margin: 0;
+      padding-left: 17px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .refs li + li { margin-top: 8px; }
+    .refs a { color: var(--ink); text-underline-offset: 2px; }
+
+    .disclaimer {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 20px;
+      padding-top: 12px;
+      border-top: 1px solid var(--ink);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 760px) {
+      .page { padding-top: 18px; }
+      .intro { display: block; margin-top: 24px; }
+      .intro p { margin-top: 12px; }
+      .workbench {
+        grid-template-columns: 1fr;
+        grid-template-areas: "drawing" "sidebar" "below";
+        gap: 14px;
+      }
+      aside { grid-template-columns: 1fr 1fr; }
+      .below-simulation { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 520px) {
+      .edition { max-width: 140px; line-height: 1.5; }
+      .scene-wrap { padding: 8px 4px 0;       }
+
+      .header-link {
+        color: var(--ink);
+        font-size: 12px;
+        font-weight: 700;
+        text-underline-offset: 3px;
+        white-space: nowrap;
+      }
+
+      .header-nav { display: flex; align-items: center; gap: 16px; }
+      .drawing-heading { padding: 11px 12px; }
+      .drawing-heading span { max-width: 145px; line-height: 1.4; }
+      aside { grid-template-columns: 1fr; }
+      .below-simulation { grid-template-columns: 1fr; }
+      footer { display: block; }
+      footer span { display: block; }
+      footer span + span { margin-top: 5px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="wordmark">Small Span / No. 01</div>
+      <nav class="header-nav" aria-label="Main navigation">
+        <div class="edition">A little bridge-building study</div>
+        <a class="header-link" href="bridge.html">Learn the forces →</a>
+      </nav>
+    </header>
+
+    <section class="intro" aria-labelledby="page-title">
+      <h1 id="page-title">A bridge, one test at a time.</h1>
+      <p>Join wooden members between the joints. Place a hanging bottle load anywhere along the span, then test what your design can carry.</p>
+    </section>
+
+    <div class="workbench">
+      <section class="drawing-panel" aria-label="Bridge drawing area">
+        <div class="drawing-heading">
+          <strong>Span 01 · 1.1 m</strong>
+          <span>Drag between joints to add a beam · tap two joints to connect</span>
+        </div>
+        <div class="scene-wrap">
+          <svg id="scene" viewBox="0 0 900 480" role="img" aria-labelledby="scene-title scene-desc">
+            <title id="scene-title">Small bridge building area</title>
+            <desc id="scene-desc">Connect the open joints above and along the wooden deck to build a bridge between two fixed banks.</desc>
+          </svg>
+        </div>
+        <p class="instructions" id="instructions" aria-live="polite">Start with triangles: they help send a deck load through the bridge members to the supports.</p>
+      </section>
+
+      <aside>
+        <section class="card controls-card" aria-labelledby="test-heading">
+          <h2 id="test-heading">Bottle test</h2>
+          <span class="control-label">Choose a filled water bottle</span>
+          <div class="bottle-choices" role="group" aria-label="Water bottle size">
+            <button class="choice" type="button" data-mass="0.25" aria-pressed="true">250 ml</button>
+            <button class="choice" type="button" data-mass="0.5" aria-pressed="false">500 ml</button>
+            <button class="choice" type="button" data-mass="0.75" aria-pressed="false">750 ml</button>
+            <button class="choice" type="button" data-mass="1" aria-pressed="false">1 litre</button>
+          </div>
+          <span class="control-label">Bottles on the hanging rig · up to 20</span>
+          <div class="stack-control">
+            <button id="bottle-down" type="button" aria-label="Remove one bottle">−</button>
+            <output class="stack-count" id="bottle-count" aria-live="polite">1 bottle</output>
+            <button id="bottle-up" type="button" aria-label="Add one bottle">+</button>
+          </div>
+          <p class="stack-summary" id="stack-summary">Test load: 0.25 kg of water at each joint.</p>
+          <p class="limit-note">* Maximum load without lower-joint bracing: 8 kg.</p>
+          <div class="actions">
+            <button class="action primary" id="test-button" type="button">Test the bridge</button>
+            <button class="action" id="undo-button" type="button">Undo beam</button>
+            <button class="action" id="reset-button" type="button">Start over</button>
+            <button class="action keep-load-point" id="reset-same-beam-button" type="button">Start over with same beam</button>
+          </div>
+          <p class="status" id="status" aria-live="polite">
+            <strong>Ready when you are.</strong>
+            <span>Place the hanging bottle rig anywhere along the span, then test your bridge.</span>
+          </p>
+        </section>
+
+        <section class="card" aria-labelledby="notes-heading">
+          <h2 id="notes-heading">Field notes</h2>
+          <p class="field-note">A triangle gives a load a path into the supports. Without bracing, a long deck has to do too much bending on its own.</p>
+          <p class="field-note">Members can pull or push; a long, slender piece under compression is more likely to buckle. Without beams connected to the lower joints, the deck has an 8 kg hanging-load limit.</p>
+        </section>
+      </aside>
+
+      <section class="below-simulation" aria-label="Building options and references">
+        <section class="card" aria-labelledby="build-menu-heading">
+          <h2 id="build-menu-heading">Build menu</h2>
+          <p class="field-note">Lower joints are an optional extra. Add them only if your design needs them.</p>
+          <details class="menu-details">
+            <summary>Optional lower joints</summary>
+            <p>Turn on a row of joints below the deck, then drag beams to connect them.</p>
+            <label class="toggle-row">
+              <input id="lower-nodes-toggle" type="checkbox">
+              <span>Show lower joints (optional)</span>
+            </label>
+          </details>
+        </section>
+
+        <section class="card donation-card" aria-labelledby="donation-heading">
+          <h2 id="donation-heading">A little support</h2>
+          <p>Help keep the project alive with a small donation. (No checkout, no link.)</p>
+          <button class="action" id="donate-button" type="button">Donate a plank</button>
+        </section>
+
+        <section class="card" aria-labelledby="reading-heading">
+          <h2 id="reading-heading">Reference shelf</h2>
+          <ul class="refs">
+            <li><a href="https://www.fs.usda.gov/t-d/pubs/htmlpubs/htm07232816/index.htm" target="_blank" rel="noopener noreferrer">USDA Forest Service, <cite>Timber Bridges: Design, Construction, Inspection, and Maintenance</cite></a></li>
+            <li><a href="https://www.fhwa.dot.gov/bridge/inspection/" target="_blank" rel="noopener noreferrer">Federal Highway Administration, bridge inspection resources</a></li>
+            <li><a href="https://awc.org/resources/2024-nds/" target="_blank" rel="noopener noreferrer">American Wood Council, <cite>2024 National Design Specification for Wood Construction</cite></a></li>
+          </ul>
+          <p class="disclaimer">These references inform the design notes. This small-scale game uses a simplified member model; it is not a real-world bridge design or safety tool.</p>
+        </section>
+
+      </section>
+    </div>
+
+    <footer>
+      <span>Wood members · water loads · learn by testing</span>
+      <span>Designed for mouse, touch, and keyboard · <a class="header-link" href="bridge.html">Interactive learning</a></span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const svg = document.getElementById("scene");
+      const instructions = document.getElementById("instructions");
+      const status = document.getElementById("status");
+      const testButton = document.getElementById("test-button");
+      const undoButton = document.getElementById("undo-button");
+      const resetButton = document.getElementById("reset-button");
+      const resetSameBeamButton = document.getElementById("reset-same-beam-button");
+      const bottleDown = document.getElementById("bottle-down");
+      const bottleUp = document.getElementById("bottle-up");
+      const bottleCountLabel = document.getElementById("bottle-count");
+      const stackSummary = document.getElementById("stack-summary");
+      const bottleButtons = [...document.querySelectorAll(".choice")];
+      const NS = "http://www.w3.org/2000/svg";
+      const deckY = 286;
+      const deckStartX = 171;
+      const deckStep = 93;
+      const deckNodes = Array.from({ length: 7 }, (_, index) => ({
+        x: deckStartX + deckStep * index,
+        y: deckY,
+        deck: true
+      }));
+      const upperNodes = Array.from({ length: 5 }, (_, index) => ({
+        x: deckStartX + deckStep * (index + 1),
+        y: 170,
+        deck: false
+      }));
+      const lowerNodes = Array.from({ length: 5 }, (_, index) => ({
+        x: deckStartX + deckStep * (index + 1),
+        y: 365,
+        deck: false,
+        lower: true
+      }));
+      const nodes = [...deckNodes, ...upperNodes, ...lowerNodes];
+      const initialMembers = Array.from({ length: 6 }, (_, index) => ({
+        a: index,
+        b: index + 1,
+        deck: true,
+        built: false,
+        id: index
+      }));
+      let members = initialMembers.map(member => ({ ...member }));
+      let nextMemberId = initialMembers.length;
+      let selectedNode = null;
+      let selectedMass = 0.25;
+      let selectedBottleCount = 1;
+      let lowerNodesEnabled = false;
+      let testing = false;
+      let failedMembers = new Set();
+      let bottleLoadStation = 3;
+      let testerPosition = null;
+      let testToken = 0;
+      let dragSource = null;
+      let dragPointerId = null;
+      let previewLine = null;
+      let deformedNodes = null;
+      let sagStation = null;
+      let sagProgress = 0;
+      let splitStation = null;
+      let splitProgress = 0;
+      let bottleFadeProgress = 0;
+      let bottleRigRemoved = false;
+      let bridgeFailed = false;
+      let collapseMotion = 0;
+      let heldMotion = 0;
+      let collapseAnimationFrame = null;
+      let collapseAnimationStartedAt = 0;
+      let fallenOffsets = new Map();
+      const lowerNodesToggle = document.getElementById("lower-nodes-toggle");
+
+      function element(name, attributes = {}) {
+        const node = document.createElementNS(NS, name);
+        for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
+        return node;
+      }
+
+      function addText(parent, x, y, value, className, anchor = "middle") {
+        const label = element("text", { x, y, "text-anchor": anchor, class: className });
+        label.textContent = value;
+        parent.append(label);
+        return label;
+      }
+
+      function setStatus(title, detail) {
+        status.replaceChildren();
+        const strong = document.createElement("strong");
+        strong.textContent = title;
+        const span = document.createElement("span");
+        span.textContent = detail;
+        status.append(strong, span);
+      }
+
+      function scenePoint(index) {
+        const point = nodes[index];
+        const fall = fallenOffsets.get(index) || { x: 0, y: 0 };
+        let x = point.x + fall.x;
+        let y = point.y + fall.y;
+        if (deformedNodes && deformedNodes.has(index)) {
+          const displacement = deformedNodes.get(index);
+          x += displacement.x * 500 * 120;
+          y -= displacement.y * 500 * 120;
+        } else if (sagStation !== null && index !== 0 && index !== 6) {
+          const loadX = deckNodes[sagStation].x;
+          const influence = Math.max(0, 1 - Math.abs(point.x - loadX) / 330);
+          const scale = point.deck ? 1 : point.lower ? 0.65 : 0.42;
+          x += (point.x < loadX ? -1 : 1) * influence * 9 * scale * sagProgress;
+          y += influence * 96 * scale * sagProgress;
+        }
+        if (splitStation !== null && splitProgress > 0 && index !== 0 && index !== 6) {
+          const splitX = deckNodes[splitStation].x;
+          const leftBankX = deckNodes[0].x;
+          const rightBankX = deckNodes[6].x;
+          const leftSide = point.x < splitX;
+          const separation = leftSide
+            ? Math.max(0, Math.min(1, (point.x - leftBankX) / (splitX - leftBankX)))
+            : Math.max(0, Math.min(1, (rightBankX - point.x) / (rightBankX - splitX)));
+          if (point.x !== splitX) x += (leftSide ? -1 : 1) * 58 * splitProgress * separation;
+          y += 18 * splitProgress * separation;
+          if (!testing && splitProgress >= 1) {
+            x += (leftSide ? -1 : 1) * collapseMotion * separation * 0.45;
+            y += collapseMotion * separation;
+          }
+        }
+        if (splitStation === null && heldMotion !== 0 && index !== 0 && index !== 6) {
+          const spanPosition = (point.x - deckNodes[0].x) / (deckNodes[6].x - deckNodes[0].x);
+          const influence = Math.sin(Math.PI * spanPosition);
+          x += (spanPosition < 0.5 ? -1 : 1) * heldMotion * influence * 0.8;
+          y += heldMotion * influence * 1.4;
+        }
+        return { ...point, x, y };
+      }
+
+      function splitMemberPoint(index, otherIndex) {
+        const point = scenePoint(index);
+        if (splitStation !== null && nodes[index].x === deckNodes[splitStation].x) {
+          const otherX = nodes[otherIndex].x;
+          const side = otherX < deckNodes[splitStation].x
+            ? -1
+            : otherX > deckNodes[splitStation].x || index < otherIndex ? 1 : -1;
+          point.x += side * 26 * splitProgress;
+        }
+        return point;
+      }
+
+      function visibleNodeIndices() {
+        const lowerConnected = members.some(member => member.a >= 12 || member.b >= 12);
+        return nodes.map((_, index) => index)
+          .filter(index => index < 12 || lowerNodesEnabled || lowerConnected);
+      }
+
+      function drawScene() {
+        svg.replaceChildren();
+
+        const title = element("title", { id: "scene-title" });
+        title.textContent = "Small bridge building area";
+        const desc = element("desc", { id: "scene-desc" });
+        desc.textContent = "Connect the open joints above and along the wooden deck to build a bridge between two fixed banks.";
+        svg.append(title, desc);
+
+        const leftBank = element("path", { d: "M20 286 H171 V353 H20 Z", class: "ground" });
+        const rightBank = element("path", { d: "M729 286 H880 V353 H729 Z", class: "ground" });
+        svg.append(leftBank, rightBank);
+
+        for (let x = 28; x < 166; x += 16) {
+          svg.append(element("path", { d: `M${x} 351 l22 -63 M${x + 8} 353 l22 -67`, class: "ground-hatch" }));
+        }
+        for (let x = 737; x < 875; x += 16) {
+          svg.append(element("path", { d: `M${x} 351 l22 -63 M${x + 8} 353 l22 -67`, class: "ground-hatch" }));
+        }
+        svg.append(element("line", { x1: 171, y1: 286, x2: 729, y2: 286, class: "guide" }));
+        addText(svg, 450, 455, "FIXED BANKS · SELECT ANY SPAN POINT", "guide-label");
+        if (lowerNodesEnabled || members.some(member => member.a >= 12 || member.b >= 12)) {
+          lowerNodes.forEach((point, index) => {
+            const nodeIndex = 12 + index;
+            const deckPoint = scenePoint(index + 1);
+            const lowerPoint = scenePoint(nodeIndex);
+            svg.append(element("line", {
+              x1: deckPoint.x, y1: deckPoint.y + 13, x2: lowerPoint.x, y2: lowerPoint.y - 12,
+              class: "lower-guide"
+            }));
+          });
+        }
+
+        svg.append(element("path", { d: "M159 286 l12 20 l12 -20 Z", class: "support" }));
+        svg.append(element("path", { d: "M717 286 l12 20 l12 -20 Z", class: "support" }));
+
+        members.forEach((member, index) => {
+          const a = splitMemberPoint(member.a, member.b);
+          const b = splitMemberPoint(member.b, member.a);
+          const splitX = splitStation === null ? null : deckNodes[splitStation].x;
+          const crossesSplit = splitX !== null &&
+            ((nodes[member.a].x <= splitX && nodes[member.b].x > splitX) ||
+            (nodes[member.b].x <= splitX && nodes[member.a].x > splitX));
+          const touchesSplitPlane = splitX !== null &&
+            (nodes[member.a].x === splitX || nodes[member.b].x === splitX);
+          const breakAtStart = touchesSplitPlane && nodes[member.a].x === splitX;
+          const breakAtEnd = touchesSplitPlane && nodes[member.b].x === splitX;
+          const isFailed = failedMembers.has(member.id) || crossesSplit || touchesSplitPlane;
+          const piece = element("g", { class: `member-piece${isFailed ? " failed" : ""}` });
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          if (isFailed) {
+            const segments = breakAtStart
+              ? [[0, 0.08], [0.24, 1]]
+              : breakAtEnd
+                ? [[0, 0.76], [0.92, 1]]
+                : [[0, 0.44], [0.56, 1]];
+            segments.forEach(([start, end]) => {
+              piece.append(element("line", {
+                x1: a.x + dx * start, y1: a.y + dy * start,
+                x2: a.x + dx * end, y2: a.y + dy * end,
+                class: "member"
+              }));
+            });
+            const breakFraction = breakAtStart ? 0.16 : breakAtEnd ? 0.84 : 0.5;
+            const middleX = a.x + dx * breakFraction;
+            const middleY = a.y + dy * breakFraction;
+            piece.append(element("path", {
+              d: `M${middleX - 4} ${middleY - 5} l4 5 l-4 5 M${middleX + 4} ${middleY - 5} l-4 5 l4 5`,
+              class: "broken-mark",
+              fill: "none"
+            }));
+          } else {
+            piece.append(
+              element("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "member" }),
+              element("line", { x1: a.x, y1: a.y - 1, x2: b.x, y2: b.y - 1, class: "member-edge" })
+            );
+          }
+          svg.append(piece);
+        });
+
+        const showTester = !bottleRigRemoved && (testing ? testerPosition !== null : true);
+        if (showTester) {
+          const testPosition = testing && testerPosition !== null ? testerPosition : bottleLoadStation;
+          const testSegment = Math.floor(testPosition);
+          const testFraction = testPosition - testSegment;
+          const firstPoint = scenePoint(testSegment);
+          const secondPoint = scenePoint(Math.min(deckNodes.length - 1, testSegment + 1));
+          const point = {
+            x: firstPoint.x + (secondPoint.x - firstPoint.x) * testFraction,
+            y: firstPoint.y + (secondPoint.y - firstPoint.y) * testFraction
+          };
+          const bottleOpacity = 1 - bottleFadeProgress;
+          svg.append(element("circle", {
+            cx: point.x, cy: point.y, r: 17, class: "test-ring", opacity: bottleOpacity
+          }));
+          const tester = element("g", {
+            class: "tester",
+            transform: `translate(${point.x},${point.y + 12})`,
+            opacity: bottleOpacity,
+            "aria-hidden": "true"
+          });
+          const bottleSpacing = 23;
+          const rigHalfWidth = (selectedBottleCount - 1) * bottleSpacing / 2;
+          tester.append(
+            element("line", {
+              x1: 0, y1: 15, x2: 0, y2: 30,
+              stroke: "#a49d90", "stroke-width": 1.3, "stroke-linecap": "round", "stroke-dasharray": "2 5"
+            }),
+            element("line", {
+              x1: -rigHalfWidth, y1: 30, x2: rigHalfWidth, y2: 30,
+              stroke: "#a49d90", "stroke-width": 1.3, "stroke-linecap": "round"
+            })
+          );
+          for (let bottle = 0; bottle < selectedBottleCount; bottle += 1) {
+            const x = (bottle - (selectedBottleCount - 1) / 2) * bottleSpacing;
+            const y = 54;
+            tester.append(
+              element("line", { x1: x, y1: 30, x2: x, y2: y - 20, stroke: "#a49d90", "stroke-width": 1.2, "stroke-linecap": "round" }),
+              element("path", { d: `M${x - 9} ${y - 12} h18 l-2 15 h-14 Z`, class: "bottle" }),
+              element("path", { d: `M${x - 7} ${y - 4} h14 l-1 5 h-12 Z`, class: "bottle-water" }),
+              element("path", { d: `M${x - 5} ${y - 18} h10 v5 h-10 Z`, class: "bottle" }),
+              element("rect", { x: x - 3, y: y - 20, width: 6, height: 4, rx: 1, class: "bottle-cap" })
+            );
+          }
+          svg.append(tester);
+        }
+
+        visibleNodeIndices().forEach(index => {
+          const point = scenePoint(index);
+          if (splitStation !== null && index === splitStation) {
+            const gap = 26 * splitProgress;
+            [-1, 1].forEach(side => {
+              svg.append(element("circle", {
+                cx: point.x + side * gap,
+                cy: point.y,
+                r: 5,
+                class: "joint deck-joint",
+                "aria-hidden": "true"
+              }));
+            });
+            return;
+          }
+          const hit = element("circle", {
+            cx: point.x,
+            cy: point.y,
+            r: 41,
+            class: "joint-hit",
+            role: "button",
+            tabindex: testing ? "-1" : "0",
+            "aria-label": `${point.deck ? "Deck" : point.lower ? "Lower" : "Upper"} joint ${index + 1}`,
+            "aria-pressed": selectedNode === index ? "true" : "false",
+            "data-node-index": index
+          });
+          hit.addEventListener("click", () => selectJoint(index));
+          hit.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              selectJoint(index);
+            }
+          });
+          svg.append(hit);
+          svg.append(element("circle", {
+            cx: point.x,
+            cy: point.y,
+            r: selectedNode === index ? 7 : 5,
+            class: `joint${point.deck ? " deck-joint" : ""}${selectedNode === index ? " selected" : ""}`,
+            "aria-hidden": "true"
+          }));
+        });
+      }
+
+      function selectJoint(index) {
+        if (testing) return;
+        if (selectedNode === null) {
+          selectedNode = index;
+          instructions.textContent = "Now choose another joint to place a wooden beam. Choose the same joint to cancel.";
+          drawScene();
+          return;
+        }
+        if (selectedNode === index) {
+          selectedNode = null;
+          instructions.textContent = "Beam cancelled. Choose two joints to connect.";
+          drawScene();
+          return;
+        }
+        connectNodes(selectedNode, index);
+      }
+
+      function connectNodes(start, end) {
+        if (testing || start === end) return;
+        const exists = members.some(member =>
+          !failedMembers.has(member.id) &&
+          ((member.a === start && member.b === end) ||
+          (member.a === end && member.b === start))
+        );
+        if (exists) {
+          instructions.textContent = "Those joints already have a beam. Choose a different pair.";
+          selectedNode = null;
+          drawScene();
+          return;
+        }
+        members.push({ a: start, b: end, deck: false, built: true, id: nextMemberId++ });
+        selectedNode = null;
+        instructions.textContent = "Beam placed. Keep building, or test your bridge when you're ready.";
+        drawScene();
+        updateControls();
+      }
+
+      function svgCoordinates(event) {
+        const point = svg.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        return point.matrixTransform(svg.getScreenCTM().inverse());
+      }
+
+      svg.addEventListener("pointerdown", event => {
+        if (testing || dragSource !== null || event.button > 0) return;
+        const joint = event.target.closest(".joint-hit");
+        if (!joint) {
+          const point = svgCoordinates(event);
+          const belowDeck = point.y > deckY + 20 && point.y < deckY + 180;
+          const withinSpan = point.x > deckStartX - 20 && point.x < deckStartX + deckStep * (deckNodes.length - 1) + 20;
+          if (belowDeck && withinSpan) {
+            bottleLoadStation = Math.min(6, Math.max(0, (point.x - deckStartX) / deckStep));
+            instructions.textContent = "Bottle rig placed under the bridge. Click Test the bridge to see whether the span can hold it.";
+            drawScene();
+          }
+          return;
+        }
+        dragSource = Number(joint.dataset.nodeIndex);
+        dragPointerId = event.pointerId;
+        const point = scenePoint(dragSource);
+        previewLine = element("line", {
+          x1: point.x, y1: point.y, x2: point.x, y2: point.y,
+          class: "beam-preview"
+        });
+        svg.insertBefore(previewLine, svg.querySelector(".joint-hit"));
+        event.preventDefault();
+      });
+
+      svg.addEventListener("pointermove", event => {
+        if (dragSource === null || event.pointerId !== dragPointerId || !previewLine) return;
+        const point = svgCoordinates(event);
+        previewLine.setAttribute("x2", point.x);
+        previewLine.setAttribute("y2", point.y);
+      });
+
+      function nearestJoint(event) {
+        const pointer = svgCoordinates(event);
+        let nearestIndex = null;
+        let nearestDistance = Infinity;
+        visibleNodeIndices().forEach(index => {
+          const point = scenePoint(index);
+          const distance = Math.hypot(pointer.x - point.x, pointer.y - point.y);
+          if (distance < nearestDistance) {
+            nearestIndex = index;
+            nearestDistance = distance;
+          }
+        });
+        return nearestDistance <= 41 ? nearestIndex : null;
+      }
+
+      function finishDrag(event) {
+        if (dragSource === null || event.pointerId !== dragPointerId) return;
+        const start = dragSource;
+        const end = nearestJoint(event);
+        dragSource = null;
+        dragPointerId = null;
+        previewLine = null;
+        if (end !== null && end !== start) {
+          connectNodes(start, end);
+        } else if (end === null) {
+          drawScene();
+        }
+      }
+
+      document.addEventListener("pointerup", finishDrag);
+      document.addEventListener("pointercancel", event => {
+        if (dragSource === null || event.pointerId !== dragPointerId) return;
+        dragSource = null;
+        dragPointerId = null;
+        previewLine = null;
+        drawScene();
+      });
+
+      function updateStackControls() {
+        const totalWaterMass = selectedMass * selectedBottleCount;
+        bottleCountLabel.textContent = `${selectedBottleCount} ${selectedBottleCount === 1 ? "bottle" : "bottles"}`;
+        stackSummary.textContent =
+          `Test load: ${totalWaterMass.toFixed(2)} kg of water hanging under the span (${selectedBottleCount} × ${Math.round(selectedMass * 1000)} ml).`;
+        bottleDown.disabled = testing || selectedBottleCount <= 1;
+        bottleUp.disabled = testing || selectedBottleCount >= 20;
+      }
+
+      function updateControls() {
+        testButton.disabled = testing || members.length === 0;
+        testButton.classList.toggle("primary", !bridgeFailed);
+        undoButton.disabled = testing || !members.length || !members[members.length - 1].built;
+        resetButton.disabled = testing;
+        resetSameBeamButton.disabled = testing;
+        resetButton.classList.toggle("recommended", !testing && bridgeFailed);
+        lowerNodesToggle.disabled = testing;
+        bottleButtons.forEach(button => { button.disabled = testing; });
+        updateStackControls();
+      }
+
+      lowerNodesToggle.addEventListener("change", () => {
+        lowerNodesEnabled = lowerNodesToggle.checked;
+        selectedNode = null;
+        drawScene();
+      });
+
+      document.addEventListener("keydown", event => {
+        if (testing) return;
+        if (event.key === "ArrowLeft") {
+          bottleLoadStation = Math.max(0, bottleLoadStation - 0.25);
+          drawScene();
+        } else if (event.key === "ArrowRight") {
+          bottleLoadStation = Math.min(6, bottleLoadStation + 0.25);
+          drawScene();
+        }
+      });
+
+      function meterCoordinates(point) {
+        return { x: (point.x - deckStartX) * 0.002, y: (deckY - point.y) * 0.002 };
+      }
+
+      function currentNodePoint(index) {
+        return scenePoint(index);
+      }
+
+      function solveBridge(loadNode, mass) {
+        const activeMembers = members
+          .filter(member => !failedMembers.has(member.id));
+        const lowerBracingUsed = activeMembers.some(member => member.a >= 12 || member.b >= 12);
+        const exceedsUnbracedLoadLimit = !lowerBracingUsed && mass > 8;
+        if (exceedsUnbracedLoadLimit) {
+          const deckMemberAtLoad = activeMembers.find(member =>
+            member.deck && (member.a === loadNode || member.b === loadNode)
+          );
+          return {
+            stable: false,
+            failedMember: deckMemberAtLoad?.id ?? null,
+            displacements: null,
+            overload: true
+          };
+        }
+        const activeNodes = [...new Set([0, 6, loadNode, ...activeMembers.flatMap(member => [member.a, member.b])])];
+        if (activeMembers.length === 0) return { stable: false, failedMember: null, displacements: null };
+        if (!activeNodes.includes(loadNode) || !activeNodes.includes(0) || !activeNodes.includes(6)) {
+          return { stable: false, failedMember: null, displacements: null };
+        }
+        const dofs = new Map();
+        activeNodes.forEach((node, localIndex) => {
+          dofs.set(node, [localIndex * 2, localIndex * 2 + 1]);
+        });
+        const size = activeNodes.length * 2;
+        const stiffness = Array.from({ length: size }, () => Array(size).fill(0));
+        const forces = Array(size).fill(0);
+        const EA = 9e9 * 10e-6;
+        const moment = 6.75e-10;
+        const youngsModulus = 9e9;
+        const memberData = [];
+
+        activeMembers.forEach(member => {
+          const p1 = meterCoordinates(currentNodePoint(member.a));
+          const p2 = meterCoordinates(currentNodePoint(member.b));
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const length = Math.hypot(dx, dy);
+          const c = dx / length;
+          const s = dy / length;
+          const axial = EA / length;
+          const local = [
+            [c * c, c * s, -c * c, -c * s],
+            [c * s, s * s, -c * s, -s * s],
+            [-c * c, -c * s, c * c, c * s],
+            [-c * s, -s * s, c * s, s * s]
+          ];
+          const indices = [...dofs.get(member.a), ...dofs.get(member.b)];
+          for (let row = 0; row < 4; row += 1) {
+            for (let col = 0; col < 4; col += 1) {
+              stiffness[indices[row]][indices[col]] += axial * local[row][col];
+            }
+          }
+          memberData.push({ member, p1, p2, length, c, s, axial, indices });
+        });
+
+        forces[dofs.get(loadNode)[1]] = -mass * 9.81;
+        const fixed = new Set([...dofs.get(0), ...dofs.get(6)]);
+        const free = Array.from({ length: size }, (_, index) => index).filter(index => !fixed.has(index));
+        const matrix = free.map(row => free.map(col => stiffness[row][col]));
+        const rhs = free.map(index => forces[index]);
+        const displacement = solveLinearSystem(matrix, rhs);
+        if (displacement === null) return { stable: false, failedMember: null, displacements: null };
+
+        const fullDisplacement = Array(size).fill(0);
+        free.forEach((index, row) => { fullDisplacement[index] = displacement[row]; });
+        const displacements = new Map(activeNodes.map(node => {
+          const [x, y] = dofs.get(node);
+          const previous = deformedNodes?.get(node) || { x: 0, y: 0 };
+          return [node, {
+            x: previous.x + fullDisplacement[x],
+            y: previous.y + fullDisplacement[y]
+          }];
+        }));
+        let weakest = { utilization: 0, index: null };
+
+        memberData.forEach(({ member, length, c, s, axial, indices }) => {
+          const extension = c * (fullDisplacement[indices[2]] - fullDisplacement[indices[0]]) +
+            s * (fullDisplacement[indices[3]] - fullDisplacement[indices[1]]);
+          const memberForce = axial * extension;
+          const tensionLimit = 160;
+          const compressionLimit = Math.PI ** 2 * youngsModulus * moment / (length ** 2);
+          const capacity = memberForce >= 0 ? tensionLimit : compressionLimit;
+          const utilization = Math.abs(memberForce) / capacity;
+          if (utilization > weakest.utilization) weakest = { utilization, index: member.id };
+        });
+
+        if (weakest.utilization > 1) {
+          return { stable: false, failedMember: weakest.index, displacements };
+        }
+        return { stable: true, failedMember: null, displacements };
+      }
+
+      function solveLinearSystem(matrix, rhs) {
+        const n = rhs.length;
+        const augmented = matrix.map((row, index) => [...row, rhs[index]]);
+        let matrixScale = 0;
+        matrix.forEach(row => row.forEach(value => { matrixScale = Math.max(matrixScale, Math.abs(value)); }));
+        const threshold = matrixScale * 1e-10;
+
+        for (let column = 0; column < n; column += 1) {
+          let pivot = column;
+          for (let row = column + 1; row < n; row += 1) {
+            if (Math.abs(augmented[row][column]) > Math.abs(augmented[pivot][column])) pivot = row;
+          }
+          if (Math.abs(augmented[pivot][column]) < threshold) return null;
+          [augmented[column], augmented[pivot]] = [augmented[pivot], augmented[column]];
+          const divisor = augmented[column][column];
+          for (let col = column; col <= n; col += 1) augmented[column][col] /= divisor;
+          for (let row = 0; row < n; row += 1) {
+            if (row === column) continue;
+            const factor = augmented[row][column];
+            for (let col = column; col <= n; col += 1) {
+              augmented[row][col] -= factor * augmented[column][col];
+            }
+          }
+        }
+        return augmented.map(row => row[n]);
+      }
+
+      function animateFrame(duration, update) {
+        return new Promise(resolve => {
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            update(1);
+            resolve();
+            return;
+          }
+          const startedAt = performance.now();
+          function frame(now) {
+            const progress = Math.min(1, (now - startedAt) / duration);
+            update(progress);
+            if (progress < 1) {
+              window.requestAnimationFrame(frame);
+            } else {
+              resolve();
+            }
+          }
+          window.requestAnimationFrame(frame);
+        });
+      }
+
+      function animateBridgeResponse(result, station, duration) {
+        sagStation = null;
+        sagProgress = 0;
+        const from = deformedNodes || new Map();
+        const to = result.displacements;
+        if (!to) return Promise.resolve();
+        return animateFrame(duration, progress => {
+          const current = new Map();
+          nodes.forEach((_, index) => {
+            const start = from.get(index) || { x: 0, y: 0 };
+            const end = to.get(index) || { x: 0, y: 0 };
+            current.set(index, {
+              x: start.x + (end.x - start.x) * progress,
+              y: start.y + (end.y - start.y) * progress
+            });
+          });
+          deformedNodes = current;
+          drawScene();
+        });
+      }
+
+      function animateBottle(from, to, duration) {
+        return animateFrame(duration, progress => {
+          testerPosition = from + (to - from) * progress;
+          drawScene();
+        });
+      }
+
+      function animateRecovery(duration) {
+        const from = deformedNodes || new Map();
+        return animateFrame(duration, progress => {
+          const next = new Map();
+          nodes.forEach((_, index) => {
+            const start = from.get(index) || { x: 0, y: 0 };
+            next.set(index, {
+              x: start.x * (1 - progress),
+              y: start.y * (1 - progress)
+            });
+          });
+          deformedNodes = next;
+          drawScene();
+        }).then(() => {
+          deformedNodes = null;
+          drawScene();
+        });
+      }
+
+      function stopCollapseAnimation() {
+        if (collapseAnimationFrame !== null) {
+          window.cancelAnimationFrame(collapseAnimationFrame);
+          collapseAnimationFrame = null;
+        }
+        collapseMotion = 0;
+        heldMotion = 0;
+      }
+
+      function resetBridgePosition() {
+        deformedNodes = null;
+        fallenOffsets = new Map();
+        sagStation = null;
+        sagProgress = 0;
+        if (failedMembers.size === 0) {
+          splitStation = null;
+          splitProgress = 0;
+        } else {
+          splitProgress = 1;
+        }
+      }
+
+      function startCollapseAnimation() {
+        if (splitStation === null || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        collapseAnimationStartedAt = performance.now();
+        const animate = now => {
+          if (splitStation === null || testing) {
+            collapseAnimationFrame = null;
+            collapseMotion = 0;
+            return;
+          }
+          collapseMotion = Math.sin((now - collapseAnimationStartedAt) / 420) * 3.5;
+          drawScene();
+          collapseAnimationFrame = window.requestAnimationFrame(animate);
+        };
+        collapseAnimationFrame = window.requestAnimationFrame(animate);
+      }
+
+      function startHeldBridgeAnimation() {
+        if (splitStation !== null || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        collapseAnimationStartedAt = performance.now();
+        const animate = now => {
+          if (splitStation !== null || testing) {
+            collapseAnimationFrame = null;
+            heldMotion = 0;
+            return;
+          }
+          heldMotion = Math.sin((now - collapseAnimationStartedAt) / 420) * 1.8;
+          drawScene();
+          collapseAnimationFrame = window.requestAnimationFrame(animate);
+        };
+        collapseAnimationFrame = window.requestAnimationFrame(animate);
+      }
+
+      function unsupportedNodes() {
+        const adjacency = new Map();
+        const used = new Set([0, 6]);
+        members.forEach(member => {
+          if (failedMembers.has(member.id)) return;
+          used.add(member.a);
+          used.add(member.b);
+          if (!adjacency.has(member.a)) adjacency.set(member.a, []);
+          if (!adjacency.has(member.b)) adjacency.set(member.b, []);
+          adjacency.get(member.a).push(member.b);
+          adjacency.get(member.b).push(member.a);
+        });
+        const supported = new Set([0, 6]);
+        const queue = [0, 6];
+        while (queue.length) {
+          const current = queue.shift();
+          for (const neighbor of adjacency.get(current) || []) {
+            if (supported.has(neighbor)) continue;
+            supported.add(neighbor);
+            queue.push(neighbor);
+          }
+        }
+        return [...used].filter(index => !supported.has(index));
+      }
+
+      function animateFailure(result, station, duration) {
+        splitStation = station;
+        splitProgress = 0;
+        const splitX = deckNodes[station].x;
+        members.forEach(member => {
+          const aX = nodes[member.a].x;
+          const bX = nodes[member.b].x;
+          if (aX === splitX || bX === splitX ||
+            (aX <= splitX && bX > splitX) || (bX <= splitX && aX > splitX)) {
+            failedMembers.add(member.id);
+          }
+        });
+        let unsupported = unsupportedNodes();
+        const localizedFailure = unsupported.length === 0;
+        if (localizedFailure) {
+          const center = station;
+          unsupported = deckNodes
+            .map((_, index) => index)
+            .filter(index => index > 0 && index < deckNodes.length - 1 &&
+              Math.abs(index - center) <= 1)
+            .flatMap(index => [index, index + 6, index + 11].filter(node => node < nodes.length));
+        }
+        const startOffsets = new Map(fallenOffsets);
+        const endOffsets = new Map(startOffsets);
+        unsupported.forEach(index => {
+          if (index === 0 || index === 6) return;
+          const point = scenePoint(index);
+          const floor = 435;
+          const existing = startOffsets.get(index) || { x: 0, y: 0 };
+          const influence = localizedFailure
+            ? Math.max(0.25, 1 - Math.abs(nodes[index].x - deckNodes[station].x) / 210)
+            : 1;
+          const direction = nodes[index].x < deckNodes[station].x ? -1 : 1;
+          endOffsets.set(index, {
+            x: existing.x + direction * Math.min(32, Math.abs(point.x - deckNodes[station].x) * 0.09) * influence,
+            y: existing.y + Math.max(0, floor - point.y) * influence
+          });
+        });
+        const startDeformation = deformedNodes || new Map();
+        const endDeformation = result.displacements || startDeformation;
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const travelDuration = reducedMotion ? 40 : duration;
+        return animateFrame(travelDuration, progress => {
+          const fallProgress = Math.min(1, progress / 0.72);
+          const eased = 1 - Math.pow(1 - fallProgress, 3);
+          splitProgress = eased;
+          bottleFadeProgress = eased;
+          const impactRattle = Math.sin(progress * Math.PI * 4) * (1 - progress) * 9;
+          const nextOffsets = new Map();
+          endOffsets.forEach((end, index) => {
+            const start = startOffsets.get(index) || { x: 0, y: 0 };
+            const direction = nodes[index].x < deckNodes[station].x ? -1 : 1;
+            nextOffsets.set(index, {
+              x: start.x + (end.x - start.x) * eased + impactRattle * direction,
+              y: start.y + (end.y - start.y) * eased + impactRattle
+            });
+          });
+          fallenOffsets = nextOffsets;
+          const nextDeformation = new Map();
+          nodes.forEach((_, index) => {
+            const start = startDeformation.get(index) || { x: 0, y: 0 };
+            const end = endDeformation.get(index) || { x: 0, y: 0 };
+            nextDeformation.set(index, {
+              x: start.x + (end.x - start.x) * eased,
+              y: start.y + (end.y - start.y) * eased
+            });
+          });
+          deformedNodes = nextDeformation;
+          drawScene();
+        });
+      }
+
+      async function testBridge() {
+        if (testing) return;
+        stopCollapseAnimation();
+        resetBridgePosition();
+        bottleRigRemoved = false;
+        bottleFadeProgress = 0;
+        testing = true;
+        selectedNode = null;
+        sagStation = null;
+        sagProgress = 0;
+        testerPosition = Math.max(1, Math.min(5, bottleLoadStation));
+        const currentToken = ++testToken;
+        const mass = selectedMass * selectedBottleCount;
+        const station = Math.max(1, Math.min(5, Math.round(bottleLoadStation)));
+        updateControls();
+        drawScene();
+        instructions.textContent = `Testing a hanging rig of ${selectedBottleCount} filled bottles at the selected span point.`;
+        setStatus("The hanging bottle rig is loading the bridge.", `Combined water load: ${mass.toFixed(2)} kg.`);
+
+        if (currentToken !== testToken) return;
+        await animateBottle(Math.max(0, station - 1), station, 260);
+        if (currentToken !== testToken) return;
+        setStatus("Testing the span…", `Bottle rig at joint ${station + 1} of 7.`);
+        let result = solveBridge(station, mass);
+        let breaksAtJoint = 0;
+        const previouslyFailedCount = failedMembers.size;
+        const breakLimit = members.length;
+        while (!result.stable && !result.overload && breaksAtJoint < breakLimit) {
+          const memberId = result.failedMember;
+          if (memberId === null || result.displacements === null) break;
+          failedMembers.add(memberId);
+          breaksAtJoint += 1;
+          result = solveBridge(station, mass);
+          if (result.displacements === null) break;
+        }
+
+        if (!result.stable) {
+          if (failedMembers.size > 0 && result.displacements === null && !result.overload) {
+            bridgeFailed = true;
+            testerPosition = station;
+            bottleRigRemoved = false;
+            testing = false;
+            drawScene();
+            updateControls();
+            instructions.textContent = "The bridge is still damaged and has no load path. Add beams to reconnect the split or start over.";
+            const newlyFailedCount = failedMembers.size - previouslyFailedCount;
+            const explanation = newlyFailedCount > 0
+              ? `${newlyFailedCount} member${newlyFailedCount === 1 ? "" : "s"} exceeded the modeled strength limits, leaving no stable load path. Add bracing to share the load and connect it to the supports.`
+              : "The bridge's existing broken members leave no stable path to carry this load. Reconnect or replace them before testing again.";
+            setStatus(
+              "The damaged bridge cannot carry this load.",
+              explanation
+            );
+            return;
+          }
+          setStatus("The bridge has snapped in two.", "The overloaded span has split at the load point.");
+          await animateFailure(result, station, 1050);
+          if (currentToken !== testToken) return;
+          testerPosition = null;
+          bottleRigRemoved = true;
+          testing = false;
+          bridgeFailed = true;
+          drawScene();
+          updateControls();
+          instructions.textContent = "The failed bridge remains in place. Add beams to repair or brace it, or reset when you choose.";
+          const newlyFailedCount = failedMembers.size - previouslyFailedCount;
+          const explanation = result.overload
+            ? `The ${mass.toFixed(2)} kg load exceeds the 8 kg limit for a bridge without beams connected to lower joints. Reduce the load or add lower-joint bracing.`
+            : newlyFailedCount > 0
+              ? `${newlyFailedCount} member${newlyFailedCount === 1 ? "" : "s"} exceeded the modeled tension or compression-buckling capacity, so the remaining bridge could not carry the load. Add bracing to share the force.`
+              : "The bridge does not have enough stable bracing to transfer this load to both supports. Add connected beams to create a continuous load path.";
+          setStatus(
+            `The bridge could not carry ${selectedBottleCount} × ${Math.round(selectedMass * 1000)} ml.`,
+            `It split near joint ${station + 1}. ${explanation}`
+          );
+          startCollapseAnimation();
+          return;
+        }
+
+        await animateBridgeResponse(result, station, 280);
+        if (currentToken !== testToken) return;
+        if (breaksAtJoint > 0) {
+          setStatus("A member snapped; the bridge held.", `The load moved through the remaining structure at joint ${station + 1}.`);
+        }
+
+        if (currentToken !== testToken) return;
+        if (currentToken !== testToken) return;
+        testing = false;
+        bridgeFailed = false;
+        drawScene();
+        updateControls();
+        instructions.textContent = "The hanging bottle rig is holding at the selected point. Test again with another load or reset when ready.";
+        if (failedMembers.size > 0) {
+          instructions.textContent = "The damaged bridge is preserved. Add beams to repair or brace it, or reset when you choose.";
+          setStatus(
+            "The bridge held the load with damage.",
+            `${failedMembers.size} broken member${failedMembers.size === 1 ? "" : "s"} remain visible. Add bracing before the next test.`
+          );
+        } else {
+          setStatus(
+            `It held ${selectedBottleCount} × ${Math.round(selectedMass * 1000)} ml at the selected load point.`,
+            `Combined water load: ${mass.toFixed(2)} kg. The loaded bridge remains animated until the next test or reset.`
+          );
+        }
+        startHeldBridgeAnimation();
+      }
+
+      bottleButtons.forEach(button => {
+        button.addEventListener("click", () => {
+          selectedMass = Number(button.dataset.mass);
+          bottleButtons.forEach(choice => {
+            choice.setAttribute("aria-pressed", choice === button ? "true" : "false");
+          });
+          updateStackControls();
+        });
+      });
+
+      bottleDown.addEventListener("click", () => {
+        selectedBottleCount = Math.max(1, selectedBottleCount - 1);
+        updateStackControls();
+        drawScene();
+      });
+      bottleUp.addEventListener("click", () => {
+        selectedBottleCount = Math.min(20, selectedBottleCount + 1);
+        updateStackControls();
+        drawScene();
+      });
+
+      testButton.addEventListener("click", testBridge);
+      undoButton.addEventListener("click", () => {
+        if (testing || !members.length || !members[members.length - 1].built) return;
+        members.pop();
+        selectedNode = null;
+        instructions.textContent = "Last beam removed. Choose two joints to place another.";
+        drawScene();
+        updateControls();
+      });
+      function startOver(keepBridgeDesign) {
+        if (testing) return;
+        stopCollapseAnimation();
+        testToken += 1;
+        if (!keepBridgeDesign) {
+          members = initialMembers.map(member => ({ ...member }));
+          nextMemberId = initialMembers.length;
+        }
+        selectedNode = null;
+        if (!keepBridgeDesign) bottleLoadStation = 3;
+        failedMembers.clear();
+        bridgeFailed = false;
+        testerPosition = null;
+        bottleRigRemoved = false;
+        bottleFadeProgress = 0;
+        deformedNodes = null;
+        sagStation = null;
+        sagProgress = 0;
+        splitStation = null;
+        splitProgress = 0;
+        fallenOffsets = new Map();
+        instructions.textContent = keepBridgeDesign
+          ? "Your bridge design is ready for another test."
+          : "Start with triangles: they help send a deck load through the bridge members to the supports.";
+        setStatus(
+          keepBridgeDesign ? "Bridge design kept." : "Ready when you are.",
+          keepBridgeDesign
+            ? "The bridge is reset and ready for another test at the same load point."
+            : "Place the hanging bottle rig anywhere along the span, then test your bridge."
+        );
+        drawScene();
+        updateControls();
+      }
+
+      resetButton.addEventListener("click", () => startOver(false));
+      resetSameBeamButton.addEventListener("click", () => startOver(true));
+
+      drawScene();
+      updateControls();
+    })();
+  </script>
+</body>
+</html>
